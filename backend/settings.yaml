@@ -1,0 +1,96 @@
+product_A:
+  age: 35
+  premium: 500
+  claims_amount: 500000
+  policyholder_count: 1000
+  projection_years: 20
+  interest_rate: 0.05
+  lapse_vector:
+  - 0.1
+  - 0.08
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  expenses:
+    commission: 150
+    maintenance: 50
+  inflation_rate: 0.02
+product_B:
+  age: 35
+  premium: 500
+  claims_amount: 500000
+  policyholder_count: 1000
+  projection_years: 20
+  interest_rate: 0.03
+  lapse_vector:
+  - 0.2
+  - 0.15
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  - 0.1
+  expenses:
+    commission: 100
+    maintenance: 40
+  inflation_rate: 0.02
+product_C:
+  age: 45
+  premium: 800
+  claims_amount: 500000
+  policyholder_count: 1000
+  projection_years: 20
+  interest_rate: 0.05
+  inflation_rate: 0.02
+  expenses:
+    commission: 100
+    maintenance: 50
+  lapse_vector:
+  - 0.1
+  - 0.08
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
+  - 0.05
