@@ -6,6 +6,11 @@ const uploadBtn = document.getElementById("uploadBtn");
 const fileUpload = document.getElementById("fileUpload");
 const runBtn = document.getElementById("runBtn");
 const summaryCards = document.getElementById("summaryCards");
+const newProductRow = document.getElementById("newProductRow");
+const newProductNameInput = document.getElementById("newProductName");
+const saveProductBtn = document.getElementById("saveProductBtn");
+const targetMarginInput = document.getElementById("targetMargin");
+const optimizeBtn = document.getElementById("optimizeBtn");
 
 const fields = {
   age: document.getElementById("age"),
@@ -92,6 +97,24 @@ function buildPayload() {
   };
 }
 
+function buildAssumptions() {
+  const lapseVector = parseLapseVector(fields.lapse_vector.value);
+  return {
+    age: Number(fields.age.value),
+    premium: Number(fields.premium.value),
+    claims_amount: Number(fields.claims_amount.value),
+    policyholder_count: Number(fields.policyholder_count.value),
+    projection_years: Number(fields.projection_years.value),
+    interest_rate: Number(fields.interest_rate.value),
+    inflation_rate: Number(fields.inflation_rate.value),
+    expenses: {
+      commission: Number(fields.commission.value),
+      maintenance: Number(fields.maintenance.value),
+    },
+    lapse_vector: lapseVector,
+  };
+}
+
 function renderSummary(metrics) {
   summaryCards.innerHTML = "";
 
@@ -103,6 +126,10 @@ function renderSummary(metrics) {
     { label: "NPV", value: formatCurrency(metrics.npv) },
     { label: "Profit Margin", value: formatPercent(metrics.profit_margin) },
   ];
+
+  if (metrics.optimal_premium !== undefined && metrics.optimal_premium !== null) {
+    items.unshift({ label: "Optimal Premium", value: formatCurrency(metrics.optimal_premium) });
+  }
 
   items.forEach((item) => {
     const card = document.createElement("div");
@@ -175,6 +202,11 @@ async function loadProducts() {
     productSelect.appendChild(option);
   });
 
+  const createOption = document.createElement("option");
+  createOption.value = "__create__";
+  createOption.textContent = "Create new";
+  productSelect.appendChild(createOption);
+
   const defaultKey = products.product_A ? "product_A" : Object.keys(products)[0];
   if (defaultKey) {
     productSelect.value = defaultKey;
@@ -220,6 +252,10 @@ async function uploadFile() {
 }
 
 async function runPricing() {
+  if (productSelect.value === "__create__") {
+    setStatus("Save the new product first", "error");
+    return;
+  }
   const payload = buildPayload();
   setStatus("Running...", "loading");
 
@@ -240,12 +276,100 @@ async function runPricing() {
   setStatus("Complete", "success");
 }
 
+async function saveNewProduct() {
+  const productKey = newProductNameInput.value.trim();
+  if (!productKey) {
+    setStatus("Enter a product name", "error");
+    return;
+  }
+
+  const assumptions = buildAssumptions();
+  setStatus("Saving product...", "loading");
+
+  const res = await fetch("/api/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ product_key: productKey, assumptions }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    setStatus(data.error || "Save failed", "error");
+    return;
+  }
+
+  products = data.products || {};
+  await loadProducts();
+  productSelect.value = productKey;
+  fillForm(productKey);
+  newProductNameInput.value = "";
+  toggleCreateMode(false);
+  setStatus("Product saved", "success");
+}
+
+async function optimizeMargin() {
+  if (productSelect.value === "__create__") {
+    setStatus("Save the new product first", "error");
+    return;
+  }
+
+  const payload = buildPayload();
+  payload.target_margin = Number(targetMarginInput.value);
+
+  if (Number.isNaN(payload.target_margin)) {
+    setStatus("Enter a valid target margin", "error");
+    return;
+  }
+
+  setStatus("Optimizing...", "loading");
+
+  const res = await fetch("/api/optimize", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    setStatus(data.error || "Optimization failed", "error");
+    return;
+  }
+
+  if (data.optimal_premium !== undefined) {
+    fields.premium.value = Number(data.optimal_premium).toFixed(2);
+  }
+
+  renderSummary({
+    ...data.metrics,
+    optimal_premium: data.optimal_premium,
+  });
+  renderCharts(data.projection);
+  setStatus("Optimization complete", "success");
+}
+
+function toggleCreateMode(enabled) {
+  if (enabled) {
+    newProductRow.classList.remove("hidden");
+    saveProductBtn.classList.remove("hidden");
+  } else {
+    newProductRow.classList.add("hidden");
+    saveProductBtn.classList.add("hidden");
+  }
+}
+
 productSelect.addEventListener("change", (event) => {
-  fillForm(event.target.value);
+  if (event.target.value === "__create__") {
+    toggleCreateMode(true);
+  } else {
+    toggleCreateMode(false);
+    fillForm(event.target.value);
+  }
 });
 
 uploadBtn.addEventListener("click", uploadFile);
 runBtn.addEventListener("click", runPricing);
+saveProductBtn.addEventListener("click", saveNewProduct);
+optimizeBtn.addEventListener("click", optimizeMargin);
 
 (async function init() {
   await loadProducts();

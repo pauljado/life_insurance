@@ -125,11 +125,31 @@ button {
   cursor: pointer;
 }
 
+button.secondary {
+  background: #1f2937;
+}
+
 button.primary {
   background: var(--primary);
   font-weight: 600;
   width: 100%;
   margin-top: 8px;
+}
+
+.hidden {
+  display: none;
+}
+
+.optimize-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.optimize-row .field-row {
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .cards {
