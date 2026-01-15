@@ -1,16 +1,28 @@
 import yaml
-from data_loader import load_mortality_data
-from engine import MarginOptimizer
+import sys
+import os
 
-# 1. Load Settings
-with open("settings.yaml", "r") as f:
+
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+
+from data_loader import load_mortality_data
+from engine import MarginOptimizer, LifePolicy # Import LifePolicy
+
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+settings_path = os.path.join(current_dir, "settings.yaml")
+
+with open(settings_path, "r") as f:
     config = yaml.safe_load(f)
 
-# 2. Load Data
+
 mortality_lookup = load_mortality_data("VBT_2015.xlsx", "Sheet1")
 
-# 3. Execute Engine
-optimizer_A = MarginOptimizer(config['product_A'])
+
+policy = LifePolicy(mortality_lookup, config['product_A'])
+
+
+optimizer_A = MarginOptimizer(policy)
 best_premium = optimizer_A.solve_for_premium(target_margin=0.07)
 
 print(f"Optimal Premium: {best_premium}")
