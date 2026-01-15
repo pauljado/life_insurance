@@ -56,6 +56,7 @@ class LifePolicy:
         self.inflation_rate = assumptions["inflation_rate"]
 
         self.mortality_map = mortality_map
+        self.final_state = None
 
     def _get_mortality_vector(self):
         return [self.mortality_map.get((self.age, d)) for d in range(1, self.projection_years + 1)]

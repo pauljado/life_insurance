@@ -1,11 +1,21 @@
 import pandas as pd
 from pathlib import Path
 
+
+def _resolve_data_path(file_name: str) -> Path:
+  """Resolve a data file relative to the workspace data folder unless absolute."""
+  candidate = Path(file_name)
+  if candidate.is_absolute():
+    return candidate
+
+  data_dir = Path(__file__).resolve().parent.parent / "data"
+  return data_dir / file_name
+
+
 # Loads data from provided VBT Excel file and creates a map of Age/Policy duration -> Mortality
 def load_mortality_data(file_name, sheet_name):
 
-  data_dir = Path("C:/Users/paula/PythonCoding/life_insurance/data")
-  file_path = data_dir / file_name
+  file_path = _resolve_data_path(file_name)
 
   df_raw_vbt = pd.read_excel(file_path, sheet_name=sheet_name, header=None)
 
@@ -30,5 +40,5 @@ def load_mortality_data(file_name, sheet_name):
 
   mortality_map = df_long.set_index(["Issue_Age", "Duration"])["Mortality_Rate"].to_dict()
 
-  print(f"Loading data from {file_name}...")
+  print(f"Loading data from {file_path}...")
   return mortality_map
