@@ -19,10 +19,13 @@ with open(settings_path, "r") as f:
 mortality_lookup = load_mortality_data("VBT_2015.xlsx", "Sheet1")
 
 
-policy = LifePolicy(mortality_lookup, config['product_A'])
+policy = LifePolicy(mortality_lookup, config['product_B'])
 
+policy.run()
 
-optimizer_A = MarginOptimizer(policy)
-best_premium = optimizer_A.solve_for_premium(target_margin=0.07)
+print(policy.summary_metrics(verbose=True))
 
-print(f"Optimal Premium: {best_premium}")
+optimizer_B = MarginOptimizer(policy)
+best_premium = optimizer_B.solve_for_premium(target_margin=0.07)
+
+#print(f"Optimal Premium: {best_premium}")
