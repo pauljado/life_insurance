@@ -26,6 +26,8 @@ SETTINGS_PATH = BACKEND_DIR / "settings.yaml"
 ALLOWED_EXTENSIONS = {".xlsx"}
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="/static")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _CACHE: dict[str, dict] = {}
 _CACHE_ORDER: list[str] = []
