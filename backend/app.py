@@ -6,10 +6,14 @@ from typing import Any
 
 import yaml
 from flask import Flask, jsonify, request, send_from_directory
+import numpy as np
 from werkzeug.utils import secure_filename
 
+from analytics.sensitivity import run_lapse_sensitivity
+from analytics.stochastic import run_stochastic_npv
 from data_loader import load_mortality_data
 from engine import LifePolicy, MarginOptimizer
+from models.vasicek import VasicekParams
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,6 +26,10 @@ SETTINGS_PATH = BACKEND_DIR / "settings.yaml"
 ALLOWED_EXTENSIONS = {".xlsx"}
 
 app = Flask(__name__, static_folder=str(FRONTEND_DIR), static_url_path="/static")
+
+_CACHE: dict[str, dict] = {}
+_CACHE_ORDER: list[str] = []
+_CACHE_MAX = 128
 
 
 def load_config() -> dict:
@@ -85,6 +93,24 @@ def _validate_assumptions(assumptions: dict) -> None:
 
 def _serialize_array(arr) -> list[float]:
     return [float(x) for x in arr]
+
+
+def _make_cache_key(endpoint: str, payload: dict) -> str:
+    return f"{endpoint}:{json.dumps(payload, sort_keys=True, default=str)}"
+
+
+def _cache_get(key: str) -> dict | None:
+    return _CACHE.get(key)
+
+
+def _cache_set(key: str, value: dict) -> None:
+    if key in _CACHE:
+        return
+    _CACHE[key] = value
+    _CACHE_ORDER.append(key)
+    if len(_CACHE_ORDER) > _CACHE_MAX:
+        oldest = _CACHE_ORDER.pop(0)
+        _CACHE.pop(oldest, None)
 
 
 @app.route("/")
@@ -257,6 +283,114 @@ def api_optimize():
         })
 
     except Exception as exc:  # noqa: BLE001 - return message to UI
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/sensitivity", methods=["POST"])
+def api_sensitivity():
+    payload = request.get_json(silent=True) or {}
+    cache_key = _make_cache_key("sensitivity", payload)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify({"cached": True, **cached})
+
+    product_key = payload.get("product_key", "product_A")
+    inputs = payload.get("inputs", {})
+    mortality_file = payload.get("mortality_file")
+    sheet_name = payload.get("sheet_name", "Sheet1")
+    modifiers = payload.get("lapse_modifiers", [])
+
+    if not modifiers:
+        modifiers = [round(x, 2) for x in list(np.arange(0.5, 1.6, 0.1))]
+
+    config = load_config()
+    if product_key not in config:
+        return jsonify({"error": f"Unknown product_key: {product_key}"}), 400
+
+    if not mortality_file:
+        return jsonify({"error": "mortality_file is required"}), 400
+
+    file_path = DATA_DIR / mortality_file
+    if mortality_file.startswith("uploads/"):
+        file_path = DATA_DIR / mortality_file
+
+    if not file_path.exists():
+        return jsonify({"error": f"Data file not found: {mortality_file}"}), 404
+
+    try:
+        assumptions = _coerce_inputs(config[product_key], inputs)
+        _validate_assumptions(assumptions)
+
+        mortality_lookup = load_mortality_data(str(file_path), sheet_name)
+        results = run_lapse_sensitivity(mortality_lookup, assumptions, modifiers)
+
+        response = {"results": results}
+        _cache_set(cache_key, response)
+        return jsonify(response)
+
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/stochastic", methods=["POST"])
+def api_stochastic():
+    payload = request.get_json(silent=True) or {}
+    cache_key = _make_cache_key("stochastic", payload)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return jsonify({"cached": True, **cached})
+
+    product_key = payload.get("product_key", "product_A")
+    inputs = payload.get("inputs", {})
+    mortality_file = payload.get("mortality_file")
+    sheet_name = payload.get("sheet_name", "Sheet1")
+    n_simulations = int(payload.get("n_simulations", 1000))
+    seed = payload.get("seed")
+    max_paths = payload.get("max_paths", 200)
+
+    vasicek_payload = payload.get("vasicek", {})
+    r0 = float(vasicek_payload.get("r0", 0.05))
+    kappa = float(vasicek_payload.get("kappa", 0.15))
+    theta = float(vasicek_payload.get("theta", 0.04))
+    sigma = float(vasicek_payload.get("sigma", 0.015))
+    dt = float(vasicek_payload.get("dt", 1.0))
+
+    config = load_config()
+    if product_key not in config:
+        return jsonify({"error": f"Unknown product_key: {product_key}"}), 400
+
+    if not mortality_file:
+        return jsonify({"error": "mortality_file is required"}), 400
+
+    file_path = DATA_DIR / mortality_file
+    if mortality_file.startswith("uploads/"):
+        file_path = DATA_DIR / mortality_file
+
+    if not file_path.exists():
+        return jsonify({"error": f"Data file not found: {mortality_file}"}), 404
+
+    try:
+        assumptions = _coerce_inputs(config[product_key], inputs)
+        _validate_assumptions(assumptions)
+
+        mortality_lookup = load_mortality_data(str(file_path), sheet_name)
+        T = int(assumptions["projection_years"])
+
+        params = VasicekParams(r0=r0, kappa=kappa, theta=theta, sigma=sigma, T=T, dt=dt)
+        output = run_stochastic_npv(
+            mortality_lookup,
+            assumptions,
+            params,
+            n_simulations=n_simulations,
+            seed=seed,
+            max_paths=max_paths,
+        )
+
+        response = {"stochastic": output}
+        _cache_set(cache_key, response)
+        return jsonify(response)
+
+    except Exception as exc:  # noqa: BLE001
         return jsonify({"error": str(exc)}), 400
 
 

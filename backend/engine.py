@@ -104,12 +104,19 @@ class LifePolicy:
 
 
     def _apply_discounting(self, state: ProjectionState):
-      i = self.interest_rate
-      v = 1 / (1 + i)
+      if np.isscalar(self.interest_rate):
+        rates_vector = np.full(state.term, self.interest_rate)
+      else:
+        rates_vector = np.array(self.interest_rate, dtype=float)
+        if len(rates_vector) < state.term:
+          raise ValueError("Length of interest rate vector does not match projection length.")
+        rates_vector = rates_vector[:state.term]
 
-      time_indices = np.arange(1, state.term + 1)
-      discount_start = np.power(v, time_indices - 1)
-      discount_end = np.power(v, time_indices)
+      v_vector = 1 / (1 + rates_vector)
+      discount_end = np.cumprod(v_vector)
+      discount_start = np.empty_like(discount_end)
+      discount_start[0] = 1.0
+      discount_start[1:] = discount_end[:-1]
 
       state.discount_factors_start = discount_start
       state.discount_factors_end = discount_end
