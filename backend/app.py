@@ -118,6 +118,16 @@ def index():
     return send_from_directory(FRONTEND_DIR, "index.html")
 
 
+@app.route("/app.js")
+def app_js():
+    return send_from_directory(FRONTEND_DIR, "app.js")
+
+
+@app.route("/styles.css")
+def styles_css():
+    return send_from_directory(FRONTEND_DIR, "styles.css")
+
+
 @app.route("/api/products")
 def api_products():
     config = load_config()

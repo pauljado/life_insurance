@@ -11,6 +11,21 @@ const newProductNameInput = document.getElementById("newProductName");
 const saveProductBtn = document.getElementById("saveProductBtn");
 const targetMarginInput = document.getElementById("targetMargin");
 const optimizeBtn = document.getElementById("optimizeBtn");
+const sensitivityBtn = document.getElementById("sensitivityBtn");
+const lapseModifiersInput = document.getElementById("lapseModifiers");
+const stochasticBtn = document.getElementById("stochasticBtn");
+const tailCards = document.getElementById("tailCards");
+
+const vasicekFields = {
+  r0: document.getElementById("vasicekR0"),
+  kappa: document.getElementById("vasicekKappa"),
+  theta: document.getElementById("vasicekTheta"),
+  sigma: document.getElementById("vasicekSigma"),
+  dt: document.getElementById("vasicekDt"),
+  sims: document.getElementById("stochasticSims"),
+  seed: document.getElementById("stochasticSeed"),
+  maxPaths: document.getElementById("stochasticMaxPaths"),
+};
 
 const fields = {
   age: document.getElementById("age"),
@@ -28,6 +43,10 @@ const fields = {
 let products = {};
 let cashflowChart = null;
 let pvChart = null;
+let sensitivityChart = null;
+let ratePathsChart = null;
+let funnelChart = null;
+let npvHistChart = null;
 
 function setStatus(message, type = "info") {
   statusEl.textContent = message;
@@ -49,6 +68,16 @@ function formatPercent(value) {
 }
 
 function parseLapseVector(raw) {
+  return raw
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter((value) => !Number.isNaN(value));
+}
+
+function parseModifiers(raw) {
+  if (!raw) return [];
   return raw
     .split(/[\n,]/)
     .map((value) => value.trim())
@@ -184,6 +213,200 @@ function renderCharts(projection) {
       scales: {
         x: { title: { display: true, text: "Policy Year" } },
         y: { title: { display: true, text: "PV Cashflow" } },
+      },
+    },
+  });
+}
+
+function renderTailCards(tailMetrics) {
+  tailCards.innerHTML = "";
+
+  const items = [
+    { label: "Mean NPV", value: formatCurrency(tailMetrics.mean) },
+    { label: "VaR 90%", value: formatCurrency(tailMetrics.var_90) },
+    { label: "VaR 95%", value: formatCurrency(tailMetrics.var_95) },
+    { label: "CTE 90%", value: formatCurrency(tailMetrics.cte_90) },
+    { label: "CTE 95%", value: formatCurrency(tailMetrics.cte_95) },
+  ];
+
+  items.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const title = document.createElement("h4");
+    title.textContent = item.label;
+    const value = document.createElement("p");
+    value.textContent = item.value;
+    card.append(title, value);
+    tailCards.appendChild(card);
+  });
+}
+
+function renderSensitivityChart(results) {
+  const labels = results.map((row) => row.modifier);
+  const margins = results.map((row) => row.profit_margin * 100);
+  const npvs = results.map((row) => row.npv);
+
+  if (sensitivityChart) sensitivityChart.destroy();
+
+  const ctx = document.getElementById("sensitivityChart");
+  sensitivityChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Profit Margin (%)",
+          data: margins,
+          borderColor: "#6366f1",
+          yAxisID: "y",
+        },
+        {
+          label: "NPV",
+          data: npvs,
+          borderColor: "#10b981",
+          yAxisID: "y1",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: "Lapse Modifier" } },
+        y: { title: { display: true, text: "Profit Margin (%)" } },
+        y1: {
+          position: "right",
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: "NPV" },
+        },
+      },
+    },
+  });
+}
+
+function renderRatePathsChart(ratePaths) {
+  if (!ratePaths || ratePaths.length === 0) return;
+
+  if (ratePathsChart) ratePathsChart.destroy();
+
+  const labels = ratePaths[0].map((_, idx) => idx);
+  const datasets = ratePaths.map((path, idx) => ({
+    label: `Path ${idx + 1}`,
+    data: path,
+    borderColor: "rgba(59, 130, 246, 0.08)",
+    borderWidth: 1,
+    pointRadius: 0,
+  }));
+
+  const ctx = document.getElementById("ratePathsChart");
+  ratePathsChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: { title: { display: true, text: "Year" } },
+        y: {
+          title: { display: true, text: "Rate" },
+          ticks: { callback: (value) => `${(value * 100).toFixed(1)}%` },
+        },
+      },
+    },
+  });
+}
+
+function renderFunnelChart(summary) {
+  if (!summary) return;
+
+  if (funnelChart) funnelChart.destroy();
+
+  const labels = summary.years;
+  const ctx = document.getElementById("funnelChart");
+  funnelChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "P05",
+          data: summary.p05,
+          borderColor: "rgba(15, 23, 42, 0.35)",
+          backgroundColor: "rgba(99, 102, 241, 0.15)",
+          fill: "+1",
+          pointRadius: 0,
+        },
+        {
+          label: "P95",
+          data: summary.p95,
+          borderColor: "rgba(15, 23, 42, 0.35)",
+          pointRadius: 0,
+        },
+        {
+          label: "Mean",
+          data: summary.mean,
+          borderColor: "#ef4444",
+          borderDash: [6, 4],
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: "Year" } },
+        y: {
+          title: { display: true, text: "Rate" },
+          ticks: { callback: (value) => `${(value * 100).toFixed(1)}%` },
+        },
+      },
+    },
+  });
+}
+
+function buildHistogram(values, bins = 30) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const width = (max - min) / bins || 1;
+  const counts = new Array(bins).fill(0);
+  const labels = new Array(bins).fill(0).map((_, i) => min + width * (i + 0.5));
+
+  values.forEach((value) => {
+    let idx = Math.floor((value - min) / width);
+    if (idx >= bins) idx = bins - 1;
+    if (idx < 0) idx = 0;
+    counts[idx] += 1;
+  });
+
+  return { labels, counts };
+}
+
+function renderNpvHistogram(npvs) {
+  if (!npvs || npvs.length === 0) return;
+
+  if (npvHistChart) npvHistChart.destroy();
+
+  const { labels, counts } = buildHistogram(npvs, 30);
+  const ctx = document.getElementById("npvHistChart");
+  npvHistChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels.map((value) => value.toFixed(0)),
+      datasets: [
+        {
+          label: "NPV Count",
+          data: counts,
+          backgroundColor: "rgba(34, 197, 94, 0.45)",
+          borderColor: "rgba(34, 197, 94, 0.8)",
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { title: { display: true, text: "NPV (binned)" } },
+        y: { title: { display: true, text: "Count" } },
       },
     },
   });
@@ -347,6 +570,76 @@ async function optimizeMargin() {
   setStatus("Optimization complete", "success");
 }
 
+async function runSensitivity() {
+  if (productSelect.value === "__create__") {
+    setStatus("Save the new product first", "error");
+    return;
+  }
+
+  const payload = buildPayload();
+  payload.lapse_modifiers = parseModifiers(lapseModifiersInput.value);
+
+  setStatus("Running sensitivity...", "loading");
+  const res = await fetch("/api/sensitivity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    setStatus(data.error || "Sensitivity failed", "error");
+    return;
+  }
+
+  renderSensitivityChart(data.results || []);
+  setStatus(data.cached ? "Sensitivity cached" : "Sensitivity complete", "success");
+}
+
+async function runStochastic() {
+  if (productSelect.value === "__create__") {
+    setStatus("Save the new product first", "error");
+    return;
+  }
+
+  const payload = buildPayload();
+  payload.n_simulations = Number(vasicekFields.sims.value) || 1000;
+  payload.max_paths = Number(vasicekFields.maxPaths.value) || 200;
+
+  if (vasicekFields.seed.value) {
+    payload.seed = Number(vasicekFields.seed.value);
+  }
+
+  payload.vasicek = {
+    r0: Number(vasicekFields.r0.value),
+    kappa: Number(vasicekFields.kappa.value),
+    theta: Number(vasicekFields.theta.value),
+    sigma: Number(vasicekFields.sigma.value),
+    dt: Number(vasicekFields.dt.value),
+  };
+
+  setStatus("Running stochastic...", "loading");
+
+  const res = await fetch("/api/stochastic", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    setStatus(data.error || "Stochastic failed", "error");
+    return;
+  }
+
+  const output = data.stochastic;
+  renderTailCards(output.tail_metrics);
+  renderRatePathsChart(output.rate_paths);
+  renderFunnelChart(output.rate_path_summary);
+  renderNpvHistogram(output.npvs);
+  setStatus(data.cached ? "Stochastic cached" : "Stochastic complete", "success");
+}
+
 function toggleCreateMode(enabled) {
   if (enabled) {
     newProductRow.classList.remove("hidden");
@@ -370,6 +663,8 @@ uploadBtn.addEventListener("click", uploadFile);
 runBtn.addEventListener("click", runPricing);
 saveProductBtn.addEventListener("click", saveNewProduct);
 optimizeBtn.addEventListener("click", optimizeMargin);
+sensitivityBtn.addEventListener("click", runSensitivity);
+stochasticBtn.addEventListener("click", runStochastic);
 
 (async function init() {
   await loadProducts();

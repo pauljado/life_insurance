@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Life Insurance Pricing UI</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -119,9 +119,83 @@
           </div>
         </div>
       </section>
+
+      <section class="panel span-2">
+        <h2>Scenario & Stochastic Analysis</h2>
+
+        <div class="split">
+          <div class="stack">
+            <h3>Sensitivity (Lapse)</h3>
+            <div class="field-row">
+              <label for="lapseModifiers">Lapse Modifiers (comma or newline separated)</label>
+              <input id="lapseModifiers" type="text" placeholder="0.5, 0.6, 0.7, ..." />
+            </div>
+            <button id="sensitivityBtn" class="secondary" type="button">Run Sensitivity</button>
+            <div class="chart-card">
+              <h3>Lapse Sensitivity</h3>
+              <canvas id="sensitivityChart"></canvas>
+            </div>
+          </div>
+
+          <div class="stack">
+            <h3>Stochastic (Vasicek)</h3>
+            <div class="form-grid">
+              <div class="field-row">
+                <label for="vasicekR0">$r_0$</label>
+                <input id="vasicekR0" type="number" step="0.0001" value="0.05" />
+              </div>
+              <div class="field-row">
+                <label for="vasicekKappa">$\kappa$</label>
+                <input id="vasicekKappa" type="number" step="0.0001" value="0.15" />
+              </div>
+              <div class="field-row">
+                <label for="vasicekTheta">$\theta$</label>
+                <input id="vasicekTheta" type="number" step="0.0001" value="0.04" />
+              </div>
+              <div class="field-row">
+                <label for="vasicekSigma">$\sigma$</label>
+                <input id="vasicekSigma" type="number" step="0.0001" value="0.015" />
+              </div>
+              <div class="field-row">
+                <label for="vasicekDt">$\Delta t$</label>
+                <input id="vasicekDt" type="number" step="0.1" value="1" />
+              </div>
+              <div class="field-row">
+                <label for="stochasticSims">Simulations</label>
+                <input id="stochasticSims" type="number" min="100" step="100" value="1000" />
+              </div>
+              <div class="field-row">
+                <label for="stochasticSeed">Seed (optional)</label>
+                <input id="stochasticSeed" type="number" step="1" />
+              </div>
+              <div class="field-row">
+                <label for="stochasticMaxPaths">Max Paths</label>
+                <input id="stochasticMaxPaths" type="number" min="10" step="10" value="200" />
+              </div>
+            </div>
+            <button id="stochasticBtn" class="secondary" type="button">Run Stochastic</button>
+            <div class="cards" id="tailCards"></div>
+          </div>
+        </div>
+
+        <div class="analysis-grid">
+          <div class="chart-card">
+            <h3>Rate Paths (Sample)</h3>
+            <canvas id="ratePathsChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Funnel of Doubt</h3>
+            <canvas id="funnelChart"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>NPV Distribution</h3>
+            <canvas id="npvHistChart"></canvas>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
